@@ -2,12 +2,14 @@ use std::io::Write;
 
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use turbo_tasks::{
-    NonLocalValue, ResolvedVc, TaskInput, Upcast, ValueToString, Vc, trace::TraceRawVcs,
+    NonLocalValue, ResolvedVc, TaskInput, TryJoinIterExt, Upcast, ValueToString, Vc,
+    trace::TraceRawVcs,
 };
 use turbo_tasks_fs::{FileSystemPath, rope::Rope};
 use turbopack_core::{
-    chunk::{AsyncModuleInfo, ChunkItem, ChunkItemWithAsyncModuleInfo, ChunkingContext},
+    chunk::{AsyncModuleInfo, ChunkItem, ChunkItemWithAsyncModuleInfo, ChunkingContext, ModuleId},
     code_builder::{Code, CodeBuilder},
     error::PrettyPrintError,
     issue::{IssueExt, IssueSeverity, StyledString, code_gen::CodeGenerationIssue},
@@ -17,7 +19,7 @@ use turbopack_core::{
 use crate::{
     EcmascriptModuleContent, EcmascriptOptions,
     references::async_module::{AsyncModuleOptions, OptionAsyncModuleOptions},
-    utils::FormatIter,
+    utils::{FormatIter, StringifyJs},
 };
 
 #[turbo_tasks::value(shared)]
@@ -25,6 +27,7 @@ use crate::{
 pub struct EcmascriptChunkItemContent {
     pub inner_code: Rope,
     pub source_map: Option<Rope>,
+    pub additional_ids: SmallVec<[ResolvedVc<ModuleId>; 1]>,
     pub options: EcmascriptChunkItemOptions,
     pub rewrite_source_path: Option<ResolvedVc<FileSystemPath>>,
     pub placeholder_for_future_extensions: (),
@@ -56,6 +59,7 @@ impl EcmascriptChunkItemContent {
             },
             inner_code: content.inner_code.clone(),
             source_map: content.source_map.clone(),
+            additional_ids: content.additional_ids.clone(),
             options: if content.is_esm {
                 EcmascriptChunkItemOptions {
                     strict: true,
@@ -104,7 +108,12 @@ impl EcmascriptChunkItemContent {
             args.push("w: __turbopack_wasm__");
             args.push("u: __turbopack_wasm_module__");
         }
+
         let mut code = CodeBuilder::default();
+        let additional_ids = self.additional_ids.iter().try_join().await?;
+        if !additional_ids.is_empty() {
+            code += "["
+        }
         if self.options.this {
             code += "(function(__turbopack_context__) {\n";
         } else {
@@ -147,6 +156,10 @@ impl EcmascriptChunkItemContent {
         }
 
         code += "})";
+        if !additional_ids.is_empty() {
+            writeln!(code, ", {}]", StringifyJs(&additional_ids))?;
+        }
+
         Ok(code.build().cell())
     }
 }
