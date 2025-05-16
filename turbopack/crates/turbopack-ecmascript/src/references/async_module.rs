@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use swc_core::{
-    common::DUMMY_SP,
+    common::{DUMMY_SP, SyntaxContext},
     ecma::ast::{ArrayLit, ArrayPat, Expr, Ident},
     quote,
 };
@@ -76,7 +76,7 @@ impl OptionAsyncModule {
 }
 
 #[turbo_tasks::value(transparent)]
-struct AsyncModuleIdents(FxIndexSet<String>);
+struct AsyncModuleIdents(FxIndexSet<(String, u32)>);
 
 async fn get_inherit_async_referenced_asset(
     r: Vc<Box<dyn ModuleReference>>,
@@ -126,6 +126,7 @@ impl AsyncModule {
                                 .get_ident(chunking_context, None, None)
                                 .await?
                                 .map(|i| i.into_module_namespace_ident().unwrap())
+                                .map(|(i, ctx)| (i, ctx.as_u32()))
                         } else {
                             None
                         }
@@ -139,6 +140,7 @@ impl AsyncModule {
                                 .get_ident(chunking_context, None, None)
                                 .await?
                                 .map(|i| i.into_module_namespace_ident().unwrap())
+                                .map(|(i, ctx)| (i, ctx.as_u32()))
                         } else {
                             None
                         }
@@ -213,8 +215,12 @@ impl AsyncModule {
             if !async_idents.is_empty() {
                 let idents = async_idents
                     .iter()
-                    .map(|ident: &String| {
-                        Ident::new(ident.clone().into(), DUMMY_SP, Default::default())
+                    .map(|(ident, ctxt)| {
+                        Ident::new(
+                            ident.clone().into(),
+                            DUMMY_SP,
+                            SyntaxContext::from_u32(*ctxt),
+                        )
                     })
                     .collect::<Vec<_>>();
 
