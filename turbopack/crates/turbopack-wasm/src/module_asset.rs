@@ -15,7 +15,7 @@ use turbopack_core::{
     output::OutputAssets,
     reference::{ModuleReferences, SingleChunkableModuleReference},
     reference_type::ReferenceType,
-    resolve::{origin::ResolveOrigin, parse::Request},
+    resolve::{ExportUsage, origin::ResolveOrigin, parse::Request},
     source::Source,
 };
 use turbopack_ecmascript::{
@@ -116,6 +116,7 @@ impl WebAssemblyModuleAsset {
             SingleChunkableModuleReference::new(
                 Vc::upcast(self.loader()),
                 Vc::cell("wasm loader".into()),
+                ExportUsage::all(),
             )
             .to_resolved()
             .await?,

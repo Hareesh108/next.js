@@ -9,7 +9,7 @@ use turbopack_core::{
     },
     module::Module,
     reference::ModuleReference,
-    resolve::{ModulePart, ModuleResolveResult},
+    resolve::{ExportUsage, ModulePart, ModuleResolveResult},
 };
 
 use super::{
@@ -106,6 +106,15 @@ impl ChunkableModuleReference for EcmascriptModulePartReference {
             inherit_async: true,
             hoisted: true,
         }))
+    }
+
+    #[turbo_tasks::function]
+    fn export_usage(&self) -> Vc<ExportUsage> {
+        match &self.part {
+            Some(ModulePart::Export(export)) => ExportUsage::named(export.clone()),
+            Some(ModulePart::Evaluation) => ExportUsage::evaluation(),
+            _ => ExportUsage::all(),
+        }
     }
 }
 
