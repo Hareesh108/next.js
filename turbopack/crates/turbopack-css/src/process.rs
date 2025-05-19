@@ -11,7 +11,7 @@ use lightningcss::{
 };
 use rustc_hash::FxHashMap;
 use smallvec::smallvec;
-use swc_core::base::sourcemap::SourceMapBuilder;
+use swc_core::{base::sourcemap::SourceMapBuilder, ecma::atoms::hstr::AlwaysInterningAtomStore};
 use tracing::Instrument;
 use turbo_rcstr::RcStr;
 use turbo_tasks::{FxIndexMap, ResolvedVc, ValueToString, Vc};
@@ -574,12 +574,14 @@ impl lightningcss::visitor::Visitor<'_> for CssValidator {
 
 fn generate_css_source_map(source_map: &parcel_sourcemap::SourceMap) -> Result<Rope> {
     let mut builder = SourceMapBuilder::new(None);
+    let mut atoms = AlwaysInterningAtomStore::default();
 
     for src in source_map.get_sources() {
         builder.add_source(&format!("{SOURCE_URL_PROTOCOL}///{src}"));
     }
 
     for (idx, content) in source_map.get_sources_content().iter().enumerate() {
+        let content = atoms.atom(content);
         builder.set_source_contents(idx as _, Some(content));
     }
 

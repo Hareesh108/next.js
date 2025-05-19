@@ -1,6 +1,7 @@
 use std::{borrow::Cow, io::Write, ops::Deref, sync::Arc};
 
 use anyhow::Result;
+use hstr::Atom;
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use regex::Regex;
@@ -406,10 +407,10 @@ impl SourceMap {
 
     pub async fn with_resolved_sources(&self, origin: Vc<FileSystemPath>) -> Result<Self> {
         async fn resolve_source(
-            source_request: Arc<str>,
-            source_content: Option<Arc<str>>,
+            source_request: Atom,
+            source_content: Option<Atom>,
             origin: Vc<FileSystemPath>,
-        ) -> Result<(Arc<str>, Arc<str>)> {
+        ) -> Result<(Atom, Atom)> {
             Ok(
                 if let Some(path) = *origin.parent().try_join((&*source_request).into()).await? {
                     let path_str = path.to_string().await?;
@@ -448,15 +449,12 @@ impl SourceMap {
             origin: Vc<FileSystemPath>,
         ) -> Result<RegularMap> {
             let map = &map.0;
-            let file = map.get_file().map(Arc::<str>::from);
+            let file = map.get_file().map(Atom::from);
             let tokens = map.tokens().map(|t| t.get_raw_token()).collect();
-            let names = map.names().map(Arc::<str>::from).collect();
+            let names = map.names().map(Atom::from).collect();
             let count = map.get_source_count() as usize;
-            let sources = map.sources().map(Arc::<str>::from).collect::<Vec<_>>();
-            let source_contents = map
-                .source_contents()
-                .map(|s| s.map(Arc::<str>::from))
-                .collect::<Vec<_>>();
+            let sources = map.sources().map(Atom::from).collect::<Vec<_>>();
+            let source_contents = map.source_contents().map(|s| s).collect::<Vec<_>>();
             let mut new_sources = Vec::with_capacity(count);
             let mut new_source_contents = Vec::with_capacity(count);
             for (source, source_content) in sources.into_iter().zip(source_contents.into_iter()) {
@@ -588,7 +586,7 @@ impl SourceMap {
                             let content = map.get_source_contents(src_id);
 
                             let (name, content) = name.zip(content)?;
-                            Some(sourcemap_content_source(name.into(), content.into()))
+                            Some(sourcemap_content_source(name.into(), (&*content).into()))
                         });
                     }
                 }
