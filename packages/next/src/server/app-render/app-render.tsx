@@ -518,7 +518,6 @@ async function generateDynamicRSCPayload(
             />
             {/* Adding requestId as react key to make metadata remount for each render */}
             <ViewportTree key={getFlightViewportKey(requestId)} />
-            {/* Not add requestId as react key to ensure segment prefetch could result consistently if nothing changed */}
             <MetadataTree key={getFlightMetadataKey(requestId)} />
           </React.Fragment>
         ),
@@ -857,8 +856,7 @@ async function getRSCPayload(
         statusCode={ctx.res.statusCode}
         isPossibleServerAction={ctx.isPossibleServerAction}
       />
-      <ViewportTree key={getFlightViewportKey(ctx.requestId)} />
-      {/* Not add requestId as react key to ensure segment prefetch could result consistently if nothing changed */}
+      <ViewportTree />
       <MetadataTree />
     </React.Fragment>
   )
@@ -926,7 +924,6 @@ async function getErrorRSCPayload(
       ViewportBoundary,
     },
     url,
-    requestId,
     workStore,
   } = ctx
 
@@ -945,9 +942,6 @@ async function getErrorRSCPayload(
     serveStreamingMetadata: serveStreamingMetadata,
   })
 
-  // {/* Adding requestId as react key to make metadata remount for each render */}
-  const metadata = <MetadataTree key={getFlightMetadataKey(requestId)} />
-
   const initialHead = (
     <React.Fragment key={flightDataPathHeadKey}>
       <NonIndex
@@ -955,12 +949,11 @@ async function getErrorRSCPayload(
         statusCode={ctx.res.statusCode}
         isPossibleServerAction={ctx.isPossibleServerAction}
       />
-      {/* Adding requestId as react key to make metadata remount for each render */}
-      <ViewportTree key={getFlightViewportKey(requestId)} />
+      <ViewportTree />
       {process.env.NODE_ENV === 'development' && (
         <meta name="next-error" content="not-found" />
       )}
-      {metadata}
+      <MetadataTree />
     </React.Fragment>
   )
 
@@ -980,7 +973,9 @@ async function getErrorRSCPayload(
   const seedData: CacheNodeSeedData = [
     initialTree[0],
     <html id="__next_error__">
-      <head>{metadata}</head>
+      <head>
+        <MetadataTree />
+      </head>
       <body>
         {process.env.NODE_ENV !== 'production' && err ? (
           <template
