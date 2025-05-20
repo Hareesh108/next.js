@@ -285,6 +285,7 @@ pub struct NapiIssue {
     pub source: Option<NapiIssueSource>,
     pub documentation_link: String,
     pub sub_issues: Vec<NapiIssue>,
+    pub import_trace: Option<serde_json::Value>,
 }
 
 impl From<&PlainIssue> for NapiIssue {
@@ -309,6 +310,10 @@ impl From<&PlainIssue> for NapiIssue {
                 .iter()
                 .map(|issue| (&**issue).into())
                 .collect(),
+            import_trace: issue
+                .import_trace
+                .as_ref()
+                .map(|trace| serde_json::to_value(&**trace).unwrap()),
         }
     }
 }

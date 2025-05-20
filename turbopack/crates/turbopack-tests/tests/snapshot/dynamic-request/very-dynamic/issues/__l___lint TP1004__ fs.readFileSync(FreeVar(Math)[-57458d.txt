@@ -10,4 +10,9 @@
       15 | readFileSync(unknown)
       16 | 
       17 | new URL(unknown, import.meta.url)
-      18 |
+      18 | 
+  
+  
+  
+  Import trace for requested module:
+    [project]/turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test] (ecmascript)

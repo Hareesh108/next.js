@@ -12,6 +12,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use auto_hash_map::AutoSet;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use turbo_rcstr::RcStr;
 use turbo_tasks::{
@@ -154,6 +155,7 @@ pub trait Issue {
 
     async fn into_plain(
         self: Vc<Self>,
+        import_trace: Option<ResolvedVc<ImportTrace>>,
         processing_path: Vc<OptionIssueProcessingPathItems>,
     ) -> Result<Vc<PlainIssue>> {
         let description = match *self.description().await? {
@@ -180,20 +182,46 @@ pub trait Issue {
                     None
                 }
             },
+            // delete sub_issues?
             sub_issues: self
                 .sub_issues()
                 .await?
                 .iter()
                 .map(|i| async move {
-                    anyhow::Ok(i.into_plain(OptionIssueProcessingPathItems::none()).await?)
+                    anyhow::Ok(
+                        i.into_plain(None, OptionIssueProcessingPathItems::none())
+                            .await?,
+                    )
                 })
                 .try_join()
                 .await?,
             processing_path: processing_path.into_plain().await?,
+            import_trace: if let Some(s) = import_trace {
+                Some(s.await?)
+            } else {
+                None
+            },
         }
         .cell())
     }
 }
+
+// A collectible trait wrapper for `ImportTraceForIssues`
+// To access data simply downcast to `ImportTraceForIssues`
+#[turbo_tasks::value_trait]
+pub trait ImportTraceForIssuesTrait {}
+
+// An association between an import trace and a collection of issues reported for a given module.
+// Used to augment issue reporting.
+//
+#[turbo_tasks::value(shared)]
+pub struct ImportTraceForIssues {
+    pub path: ResolvedVc<ImportTrace>,
+    pub issues: Vec<ResolvedVc<Box<dyn Issue>>>,
+}
+
+#[turbo_tasks::value_impl]
+impl ImportTraceForIssuesTrait for ImportTraceForIssues {}
 
 #[turbo_tasks::value_trait]
 trait IssueProcessingPath {
@@ -370,6 +398,7 @@ pub struct CapturedIssues {
     issues: AutoSet<ResolvedVc<Box<dyn Issue>>>,
     #[cfg(feature = "issue_path")]
     processing_path: ResolvedVc<ItemIssueProcessingPath>,
+    import_trace: AutoSet<ResolvedVc<Box<dyn ImportTraceForIssuesTrait>>>,
 }
 
 #[turbo_tasks::value_impl]
@@ -397,38 +426,38 @@ impl CapturedIssues {
         self.issues.iter().copied()
     }
 
-    /// Returns an iterator over the issues with the shortest path from the root
-    /// issue to each issue.
-    pub fn iter_with_shortest_path(
-        &self,
-    ) -> impl Iterator<
-        Item = (
-            ResolvedVc<Box<dyn Issue>>,
-            Vc<OptionIssueProcessingPathItems>,
-        ),
-    > + '_ {
-        self.issues.iter().map(|issue| {
-            #[cfg(feature = "issue_path")]
-            let path = self.processing_path.shortest_path(**issue);
-            #[cfg(not(feature = "issue_path"))]
-            let path = OptionIssueProcessingPathItems::none();
-            (*issue, path)
-        })
-    }
-
+    // Returns all the issues as formatted `PlainIssues`.
     pub async fn get_plain_issues(&self) -> Result<Vec<ReadRef<PlainIssue>>> {
+        let issue_to_trace = self
+            .import_trace
+            .iter()
+            .map(|trace| async move {
+                ResolvedVc::try_downcast_type::<ImportTraceForIssues>(*trace)
+                    .unwrap()
+                    .await
+            })
+            .try_join()
+            .await?
+            .iter()
+            .flat_map(|trace| trace.issues.iter().map(|issue| (*issue, *trace.path)))
+            .collect::<FxHashMap<_, _>>();
+
         let mut list = self
             .issues
             .iter()
-            .map(|&issue| async move {
-                #[cfg(feature = "issue_path")]
-                return issue
-                    .into_plain(self.processing_path.shortest_path(*issue))
-                    .await;
-                #[cfg(not(feature = "issue_path"))]
-                return issue
-                    .into_plain(OptionIssueProcessingPathItems::none())
-                    .await;
+            .map(|&issue| {
+                let issue_to_trace = &issue_to_trace;
+                async move {
+                    let import_trace = issue_to_trace.get(&issue).cloned();
+                    #[cfg(feature = "issue_path")]
+                    return issue
+                        .into_plain(import_trace, self.processing_path.shortest_path(*issue))
+                        .await;
+                    #[cfg(not(feature = "issue_path"))]
+                    return issue
+                        .into_plain(import_trace, OptionIssueProcessingPathItems::none())
+                        .await;
+                }
             })
             .try_join()
             .await?;
@@ -635,6 +664,9 @@ pub struct OptionIssueSource(Option<IssueSource>);
 #[turbo_tasks::value(transparent)]
 pub struct OptionStyledString(Option<ResolvedVc<StyledString>>);
 
+#[turbo_tasks::value(transparent, shared)]
+pub struct ImportTrace(pub Vec<RcStr>);
+
 #[turbo_tasks::value(shared, serialization = "none")]
 #[derive(Clone, Debug, PartialOrd, Ord, DeterministicHash, Serialize)]
 pub enum IssueStage {
@@ -693,6 +725,7 @@ pub struct PlainIssue {
     pub source: Option<PlainIssueSource>,
     pub sub_issues: Vec<ReadRef<PlainIssue>>,
     pub processing_path: ReadRef<PlainIssueProcessingPath>,
+    pub import_trace: Option<ReadRef<ImportTrace>>,
 }
 
 fn hash_plain_issue(issue: &PlainIssue, hasher: &mut Xxh3Hash64Hasher, full: bool) {
@@ -736,22 +769,6 @@ impl PlainIssue {
         let mut hasher = Xxh3Hash64Hasher::new();
         hash_plain_issue(self, &mut hasher, full);
         hasher.finish()
-    }
-}
-
-#[turbo_tasks::value_impl]
-impl PlainIssue {
-    /// We need deduplicate issues that can come from unique paths, but
-    /// represent the same underlying problem. Eg, a parse error for a file
-    /// that is compiled in both client and server contexts.
-    ///
-    /// Passing [full] will also hash any sub-issues and processing paths. While
-    /// useful for generating exact matching hashes, it's possible for the
-    /// same issue to pass from multiple processing paths, making for overly
-    /// verbose logging.
-    #[turbo_tasks::function]
-    pub fn internal_hash(&self, full: bool) -> Vc<u64> {
-        Vc::cell(self.internal_hash_ref(full))
     }
 }
 
@@ -961,6 +978,7 @@ where
                 None,
                 self.peek_collectibles(),
             )),
+            import_trace: self.peek_collectibles(),
         })
     }
 
@@ -972,6 +990,7 @@ where
                 None,
                 self.take_collectibles(),
             )),
+            import_trace: self.take_collectibles(),
         })
     }
 }

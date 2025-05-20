@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use tracing_subscriber::{Registry, layer::SubscriberExt, util::SubscriberInitExt};
 use turbo_rcstr::RcStr;
 use turbo_tasks::{
-    Completion, NonLocalValue, OperationVc, ResolvedVc, TryJoinIterExt, TurboTasks, Value, Vc,
-    apply_effects, debug::ValueDebugFormat, fxindexmap, trace::TraceRawVcs,
+    Completion, NonLocalValue, OperationVc, ResolvedVc, TurboTasks, Value, Vc, apply_effects,
+    debug::ValueDebugFormat, fxindexmap, trace::TraceRawVcs,
 };
 use turbo_tasks_backend::{BackendOptions, TurboTasksBackend, noop_backing_storage};
 use turbo_tasks_bytes::stream::SingleValue;
@@ -37,7 +37,7 @@ use turbopack_core::{
     context::AssetContext,
     environment::{Environment, ExecutionEnvironment, NodeJsEnvironment},
     file_source::FileSource,
-    issue::{Issue, IssueDescriptionExt},
+    issue::IssueDescriptionExt,
     reference_type::{InnerAssets, ReferenceType},
     resolve::{
         ExternalTraced, ExternalType,
@@ -507,11 +507,7 @@ async fn snapshot_issues(
 
     let captured_issues = run_result_op.peek_issues_with_path().await?;
 
-    let plain_issues = captured_issues
-        .iter_with_shortest_path()
-        .map(|(issue_vc, path)| async move { issue_vc.into_plain(path).await })
-        .try_join()
-        .await?;
+    let plain_issues = captured_issues.get_plain_issues().await?;
 
     turbopack_test_utils::snapshot::snapshot_issues(
         plain_issues,

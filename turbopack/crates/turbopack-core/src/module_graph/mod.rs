@@ -5,8 +5,9 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use petgraph::{
+    Directed,
     graph::{DiGraph, EdgeIndex, NodeIndex},
-    visit::{Dfs, EdgeRef, IntoNodeReferences, NodeIndexable, VisitMap, Visitable},
+    visit::{Dfs, EdgeRef, IntoNodeReferences, NodeIndexable, Reversed, VisitMap, Visitable},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,7 @@ use turbo_tasks::{
 
 use crate::{
     chunk::{AsyncModuleInfo, ChunkingContext, ChunkingType},
-    issue::Issue,
+    issue::{ImportTrace, ImportTraceForIssues, ImportTraceForIssuesTrait, Issue},
     module::Module,
     module_graph::{
         async_module_info::{AsyncModulesInfo, compute_async_module_info},
@@ -215,16 +216,19 @@ impl SingleModuleGraph {
         let node_count = visited_nodes.0.len();
         drop(visited_nodes);
 
-        let mut graph = DiGraph::with_capacity(
-            node_count,
-            // From real world measurements each module has about 3-4 children
-            // If it has more this would cause an additional allocation, but that's fine
-            node_count * 4,
-        );
+        let mut graph: petgraph::Graph<SingleModuleGraphNode, ChunkingType, Directed> =
+            DiGraph::with_capacity(
+                node_count,
+                // From real world measurements each module has about 3-4 children
+                // If it has more this would cause an additional allocation, but that's fine
+                node_count * 4,
+            );
 
         let mut number_of_modules = 0;
         let mut modules: FxHashMap<ResolvedVc<Box<dyn Module>>, NodeIndex> =
             FxHashMap::with_capacity_and_hasher(node_count, Default::default());
+        // Collect the association between modules and issues while building the graph.
+        let mut issues = Vec::new();
         {
             let _span = tracing::info_span!("build module graph").entered();
             for (parent, current) in children_nodes_iter.into_breadth_first_edges() {
@@ -254,11 +258,7 @@ impl SingleModuleGraph {
                             *current_idx
                         } else {
                             let idx = graph.add_node(SingleModuleGraphNode::Module(
-                                SingleModuleGraphModuleNode {
-                                    module,
-                                    issues: Default::default(),
-                                    layer,
-                                },
+                                SingleModuleGraphModuleNode { module, layer },
                             ));
                             number_of_modules += 1;
                             modules.insert(module, idx);
@@ -304,7 +304,6 @@ impl SingleModuleGraph {
                                 None => {
                                     SingleModuleGraphNode::Module(SingleModuleGraphModuleNode {
                                         module: target,
-                                        issues: Default::default(),
                                         layer: target_layer,
                                     })
                                 }
@@ -316,15 +315,9 @@ impl SingleModuleGraph {
                     }
                     SingleModuleGraphBuilderNode::Issues(new_issues) => {
                         let (parent_idx, _) = parent_edge.unwrap();
-                        let SingleModuleGraphNode::Module(SingleModuleGraphModuleNode {
-                            issues,
-                            ..
-                        }) = graph.node_weight_mut(parent_idx).unwrap()
-                        else {
-                            bail!("Expected Module node");
-                        };
-
-                        issues.extend(new_issues);
+                        // NOTE: we don't need to dedupe multiple issues for the same module, by
+                        // construction there can only be set
+                        issues.push((parent_idx, new_issues));
                     }
                 }
             }
@@ -344,6 +337,66 @@ impl SingleModuleGraph {
             }
             if !duplicates.is_empty() {
                 panic!("Duplicate module idents in graph: {duplicates:#?}");
+            }
+        }
+
+        // If there were any
+        if !issues.is_empty() {
+            let roots_indices = entries
+                .iter()
+                .flat_map(|m| m.entries())
+                .map(|m| *modules.get(&m).expect("all roots should have been visited"))
+                .collect::<FxHashSet<_>>();
+            // Reverse the graph so we can find routes to roots.
+            let reversed_graph = Reversed(&graph);
+            for (module_idx, new_issues) in issues {
+                let Some((_, path)) = petgraph::algo::astar(
+                    reversed_graph,
+                    module_idx,
+                    |n| roots_indices.contains(&n),
+                    // Edge weights
+                    |e| match e.weight() {
+                        // Prefer following normal imports/requires when we can
+                        ChunkingType::Parallel { .. } => 0,
+                        _ => 1,
+                    },
+                    // `astar` can be accelerated with a distance estimation heuristic, however we
+                    // don't have a mechanism, so just estimate 0 which essentially makes this
+                    // behave like dijktra's shortest path algorithm.  `petgraph` has an
+                    // implementation of dijkstra's but it doesn't report paths, just distances.
+                    // NOTE: dijkstra's with integer weights can be accelerated with incredibly
+                    // efficient priority queue structures (basically with only 0 and 1 as weights
+                    // you can use a `VecDeque`!).  However, this is unlikely to be a performance
+                    // concern.
+                    |_| 0,
+                ) else {
+                    unreachable!("there must be a path to a root");
+                };
+                let path = path
+                    .into_iter()
+                    .map(async |n| {
+                        let node = graph.node_weight(n).unwrap();
+                        let SingleModuleGraphNode::Module(SingleModuleGraphModuleNode {
+                            module,
+                            ..
+                        }) = node
+                        else {
+                            unreachable!("issues are only ever attached to modules")
+                        };
+                        Ok((*module.ident().to_string().await?).clone())
+                    })
+                    .try_join()
+                    .await?;
+                let path = ImportTrace(path).resolved_cell();
+
+                let import_trace = ImportTraceForIssues {
+                    path,
+                    issues: new_issues,
+                }
+                .resolved_cell();
+                turbo_tasks::emit(ResolvedVc::upcast::<Box<dyn ImportTraceForIssuesTrait>>(
+                    import_trace,
+                ));
             }
         }
 
@@ -1311,7 +1364,6 @@ impl SingleModuleGraph {
 pub struct SingleModuleGraphModuleNode {
     pub module: ResolvedVc<Box<dyn Module>>,
     pub layer: Option<ReadRef<RcStr>>,
-    pub issues: Vec<ResolvedVc<Box<dyn Issue>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TraceRawVcs, NonLocalValue)]
@@ -1330,17 +1382,6 @@ impl SingleModuleGraphNode {
             SingleModuleGraphNode::VisitedModule { module, .. } => *module,
         }
     }
-
-    // fn emit_issues(&self) {
-    //     match self {
-    //         SingleModuleGraphNode::Module { issues, .. } => {
-    //             for issue in issues {
-    //                 issue.emit();
-    //             }
-    //         }
-    //         SingleModuleGraphNode::VisitedModule { .. } => todo!(),
-    //     }
-    // }
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -1378,7 +1419,6 @@ enum SingleModuleGraphBuilderNode {
         idx: GraphNodeIndex,
     },
     /// Issues to be added to the parent Module node
-    #[allow(dead_code)]
     Issues(Vec<ResolvedVc<Box<dyn Issue>>>),
 }
 
@@ -1468,22 +1508,23 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
         async move {
             Ok(match (module, chunkable_ref_target) {
                 (Some(module), None) => {
-                    let refs_cell = primary_chunkable_referenced_modules(*module, include_traced);
-                    let refs = match refs_cell.await {
+                    let refs_cell = primary_chunkable_referenced_modules(module, include_traced);
+                    let refs = match refs_cell.read_strongly_consistent().await {
                         Ok(refs) => refs,
                         Err(e) => {
                             return Err(e.context(module.ident().to_string().await?));
                         }
                     };
-                    // TODO This is currently too slow
-                    // let refs_issues = refs_cell
-                    //     .take_collectibles::<Box<dyn Issue>>()
-                    //     .iter()
-                    //     .map(|issue| issue.to_resolved())
-                    //     .try_join()
-                    // .await?;
+                    // TODO(lukesandberg): Check if this (and the read_strongly_consistent) above
+                    // are too slow.
+                    let refs_issues: Vec<ResolvedVc<Box<dyn Issue>>> = refs_cell
+                        .take_collectibles::<Box<dyn Issue>>()
+                        .iter()
+                        .copied()
+                        .collect();
 
-                    refs.iter()
+                    let mut targets = refs
+                        .iter()
                         .flat_map(|(ty, modules)| modules.iter().map(|m| (ty.clone(), *m)))
                         .map(async |(ty, target)| {
                             let to = if ty == COMMON_CHUNKING_TYPE {
@@ -1499,7 +1540,13 @@ impl Visit<SingleModuleGraphBuilderNode> for SingleModuleGraphBuilder<'_> {
                             Ok(SingleModuleGraphBuilderEdge { to })
                         })
                         .try_join()
-                        .await?
+                        .await?;
+                    if !refs_issues.is_empty() {
+                        targets.push(SingleModuleGraphBuilderEdge {
+                            to: SingleModuleGraphBuilderNode::Issues(refs_issues),
+                        });
+                    }
+                    targets
                 }
                 (None, Some(chunkable_ref_target)) => {
                     vec![SingleModuleGraphBuilderEdge {

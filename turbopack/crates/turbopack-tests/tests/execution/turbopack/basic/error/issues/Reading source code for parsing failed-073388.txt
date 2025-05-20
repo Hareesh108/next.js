@@ -3,3 +3,9 @@ error - [load] [project]/turbopack/crates/turbopack-tests/tests/execution/turbop
   
   Caused by:
   - invalid utf-8 sequence of 1 bytes from index 1
+  
+  Import trace for requested module:
+    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/broken.js [test] (ecmascript)
+    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/index.js [test] (ecmascript)
+    [project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => "[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/index.js [test] (ecmascript)" } [test] (ecmascript)
+    [turbopack-node]/ipc/evaluate.ts/evaluate.js { INNER => "[project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => \"[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/index.js [test] (ecmascript)\" } [test] (ecmascript)", RUNTIME => "[turbopack-node]/ipc/evaluate.ts [test] (ecmascript)" } [test] (ecmascript)

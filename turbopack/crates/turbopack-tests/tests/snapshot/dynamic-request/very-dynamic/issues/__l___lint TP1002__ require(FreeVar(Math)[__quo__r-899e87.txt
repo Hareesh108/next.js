@@ -11,3 +11,8 @@
       12 | import(unknown)
       13 | 
       14 | fs.readFileSync(unknown)
+  
+  
+  
+  Import trace for requested module:
+    [project]/turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test] (ecmascript)

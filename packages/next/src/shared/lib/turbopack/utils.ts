@@ -129,7 +129,7 @@ export function processIssues(
 }
 
 export function formatIssue(issue: Issue) {
-  const { filePath, title, description, source } = issue
+  const { filePath, title, description, source, importTrace } = issue
   let { documentationLink } = issue
   let formattedTitle = renderStyledStringToErrorAnsi(title).replace(
     /\n/g,
@@ -198,8 +198,12 @@ export function formatIssue(issue: Issue) {
   //   message += renderStyledStringToErrorAnsi(detail) + '\n\n'
   // }
 
-  // TODO: Include a trace from the issue.
-
+  if (importTrace) {
+    message +=
+      'Import trace for requested module:\n' +
+      importTrace.map((i) => '  ' + i).join('\n') +
+      '\n\n'
+  }
   if (documentationLink) {
     message += documentationLink + '\n\n'
   }

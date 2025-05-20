@@ -12,10 +12,10 @@ use anyhow::{Result, anyhow};
 use crossterm::style::{StyledContent, Stylize};
 use owo_colors::{OwoColorize as _, Style};
 use rustc_hash::{FxHashMap, FxHashSet};
-use turbo_tasks::{RawVc, ReadRef, TransientInstance, TransientValue, TryJoinIterExt, Vc};
+use turbo_tasks::{RawVc, ReadRef, TransientInstance, TransientValue, Vc};
 use turbo_tasks_fs::{FileLinesContent, source_context::get_source_context};
 use turbopack_core::issue::{
-    CapturedIssues, Issue, IssueReporter, IssueSeverity, PlainIssue, PlainIssueProcessingPathItem,
+    CapturedIssues, IssueReporter, IssueSeverity, PlainIssue, PlainIssueProcessingPathItem,
     PlainIssueSource, StyledString,
 };
 
@@ -141,7 +141,7 @@ pub fn format_issue(
         .replace("[project]", &current_dir.to_string_lossy())
         .replace("/./", "/")
         .replace("\\\\?\\", "");
-    let stgae = plain_issue.stage.to_string();
+    let stage = plain_issue.stage.to_string();
 
     let mut styled_issue = style_issue_source(plain_issue, &context_path);
     let description = &plain_issue.description;
@@ -170,12 +170,18 @@ pub fn format_issue(
             writeln!(styled_issue, "{path}").unwrap();
         }
     }
+    if let Some(trace) = &plain_issue.import_trace {
+        writeln!(styled_issue, "Import trace for requested module:").unwrap();
+        for line in trace {
+            writeln!(styled_issue, "  {line}").unwrap();
+        }
+    }
 
     write!(
         issue_text,
         "{} - [{}] {}",
         severity.style(severity_to_style(severity)),
-        stgae,
+        stage,
         plain_issue.file_path
     )
     .unwrap();
@@ -354,15 +360,14 @@ impl IssueReporter for ConsoleUi {
         } = self.options;
         let mut grouped_issues: GroupedIssues = FxHashMap::default();
 
-        let issues = issues
-            .iter_with_shortest_path()
-            .map(|(issue, path)| async move {
-                let plain_issue = issue.into_plain(path);
-                let id = plain_issue.internal_hash(false).await?;
-                Ok((plain_issue.await?, *id))
+        let plain_issues = issues.get_plain_issues().await?;
+        let issues = plain_issues
+            .iter()
+            .map(|plain_issue| {
+                let id = plain_issue.internal_hash_ref(false);
+                (plain_issue, id)
             })
-            .try_join()
-            .await?;
+            .collect::<Vec<_>>();
 
         let issue_ids = issues.iter().map(|(_, id)| *id).collect::<FxHashSet<_>>();
         let mut new_ids = self
@@ -390,7 +395,7 @@ impl IssueReporter for ConsoleUi {
             let category_map = severity_map.entry(stage.clone()).or_default();
             let issues = category_map.entry(context_path.to_string()).or_default();
 
-            let mut styled_issue = style_issue_source(&plain_issue, &context_path);
+            let mut styled_issue = style_issue_source(plain_issue, &context_path);
             let description = &plain_issue.description;
             if let Some(description) = description {
                 writeln!(

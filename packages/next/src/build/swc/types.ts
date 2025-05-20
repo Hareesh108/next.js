@@ -96,6 +96,7 @@ export interface Issue {
   }
   documentationLink: string
   subIssues: Issue[]
+  importTrace?: string[]
 }
 
 export interface Diagnostics {

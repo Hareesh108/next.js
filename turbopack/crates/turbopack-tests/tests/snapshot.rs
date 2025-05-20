@@ -43,7 +43,7 @@ use turbopack_core::{
     environment::{BrowserEnvironment, Environment, ExecutionEnvironment, NodeJsEnvironment},
     file_source::FileSource,
     free_var_references,
-    issue::{Issue, IssueDescriptionExt},
+    issue::IssueDescriptionExt,
     module::Module,
     module_graph::{
         ModuleGraph,
@@ -182,11 +182,7 @@ async fn run_inner_operation(resource: RcStr) -> Result<()> {
     let out_vc = out_op.resolve_strongly_consistent().await?;
     let captured_issues = out_op.peek_issues_with_path().await?;
 
-    let plain_issues = captured_issues
-        .iter_with_shortest_path()
-        .map(|(issue_vc, path)| async move { issue_vc.into_plain(path).await })
-        .try_join()
-        .await?;
+    let plain_issues = captured_issues.get_plain_issues().await?;
 
     snapshot_issues(plain_issues, out_vc.join("issues".into()), &REPO_ROOT)
         .await

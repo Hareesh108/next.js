@@ -131,7 +131,7 @@ async fn get_update_stream_item_operation(
                         .resolved_cell(),
                 }
                 .cell()
-                .into_plain(OptionIssueProcessingPathItems::none())
+                .into_plain(None, OptionIssueProcessingPathItems::none())
                 .await?,
             );
 
