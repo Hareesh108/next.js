@@ -227,6 +227,8 @@ export interface Project {
     TurbopackResult<CompilationEvent>
   >
 
+  invalidatePersistentCache(): Promise<void>
+
   shutdown(): Promise<void>
 
   onExit(): Promise<void>
