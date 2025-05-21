@@ -149,10 +149,6 @@ pub trait Issue {
         Vc::cell(None)
     }
 
-    fn sub_issues(self: Vc<Self>) -> Vc<Issues> {
-        Vc::cell(Vec::new())
-    }
-
     async fn into_plain(
         self: Vc<Self>,
         import_trace: Option<ResolvedVc<ImportTrace>>,
@@ -182,19 +178,6 @@ pub trait Issue {
                     None
                 }
             },
-            // delete sub_issues?
-            sub_issues: self
-                .sub_issues()
-                .await?
-                .iter()
-                .map(|i| async move {
-                    anyhow::Ok(
-                        i.into_plain(None, OptionIssueProcessingPathItems::none())
-                            .await?,
-                    )
-                })
-                .try_join()
-                .await?,
             processing_path: processing_path.into_plain().await?,
             import_trace: if let Some(s) = import_trace {
                 Some(s.await?)
@@ -723,7 +706,6 @@ pub struct PlainIssue {
     pub documentation_link: RcStr,
 
     pub source: Option<PlainIssueSource>,
-    pub sub_issues: Vec<ReadRef<PlainIssue>>,
     pub processing_path: ReadRef<PlainIssueProcessingPath>,
     pub import_trace: Option<ReadRef<ImportTrace>>,
 }
@@ -747,11 +729,6 @@ fn hash_plain_issue(issue: &PlainIssue, hasher: &mut Xxh3Hash64Hasher, full: boo
     }
 
     if full {
-        hasher.write_value(issue.sub_issues.len());
-        for i in &issue.sub_issues {
-            hash_plain_issue(i, hasher, full);
-        }
-
         hasher.write_ref(&issue.processing_path);
     }
 }
