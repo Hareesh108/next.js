@@ -9,6 +9,7 @@ import { PHASE_DEVELOPMENT_SERVER } from '../shared/lib/constants'
 // this process should be started with following arg order
 // 1. mode e.g. dev, export, start
 // 2. project dir
+// 3. root dir
 ;(async () => {
   const args = [...process.argv]
   let dir = args.pop()
