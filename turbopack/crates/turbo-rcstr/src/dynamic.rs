@@ -1,6 +1,4 @@
-use std::ptr::NonNull;
-
-use triomphe::Arc;
+use std::{ptr::NonNull, sync::Arc};
 
 use crate::{
     INLINE_TAG_INIT, LEN_OFFSET, RcStr, TAG_MASK,

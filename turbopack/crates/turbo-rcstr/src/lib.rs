@@ -7,12 +7,12 @@ use std::{
     num::NonZeroU8,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use debug_unreachable::debug_unreachable;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use shrink_to_fit::ShrinkToFit;
-use triomphe::Arc;
 use turbo_tasks_hash::{DeterministicHash, DeterministicHasher};
 
 use crate::{dynamic::new_atom, tagged_value::TaggedValue};
@@ -127,6 +127,14 @@ impl RcStr {
         }
 
         Self { unsafe_data: alias }
+    }
+
+    pub fn to_arc(&self) -> Arc<String> {
+        match self.tag() {
+            DYNAMIC_TAG => unsafe { dynamic::restore_arc(self.unsafe_data) },
+            INLINE_TAG => Arc::new(self.as_str().to_string()),
+            _ => unsafe { debug_unreachable!() },
+        }
     }
 }
 
@@ -309,7 +317,7 @@ impl ShrinkToFit for RcStr {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::ManuallyDrop;
+    use std::{mem::ManuallyDrop, sync::Arc};
 
     use super::*;
 
@@ -318,7 +326,7 @@ mod tests {
         fn refcount(str: &RcStr) -> usize {
             assert!(str.tag() == DYNAMIC_TAG);
             let arc = ManuallyDrop::new(unsafe { dynamic::restore_arc(str.unsafe_data) });
-            triomphe::Arc::count(&arc)
+            Arc::strong_count(&arc)
         }
 
         let str = RcStr::from("this is a long string that won't be inlined");
