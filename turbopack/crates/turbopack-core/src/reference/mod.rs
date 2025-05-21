@@ -287,6 +287,7 @@ pub async fn primary_chunkable_referenced_modules(
     module: ResolvedVc<Box<dyn Module>>,
     include_traced: bool,
 ) -> Result<Vc<ModulesWithChunkingType>> {
+    turbo_tasks::mark_root();
     let modules = module
         .references()
         .await?
