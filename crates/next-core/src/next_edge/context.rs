@@ -108,11 +108,17 @@ pub async fn get_edge_resolve_options_context(
     mode: Vc<NextMode>,
     next_config: Vc<NextConfig>,
     execution_context: Vc<ExecutionContext>,
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
 ) -> Result<Vc<ResolveOptionsContext>> {
-    let next_edge_import_map =
-        get_next_edge_import_map(*project_path, ty, next_config, execution_context)
-            .to_resolved()
-            .await?;
+    let next_edge_import_map = get_next_edge_import_map(
+        *project_path,
+        ty,
+        next_config,
+        execution_context,
+        collected_root_params,
+    )
+    .to_resolved()
+    .await?;
 
     let ty: ServerContextType = ty.into_value();
 

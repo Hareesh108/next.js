@@ -2,7 +2,7 @@ use std::iter::once;
 
 use anyhow::{Result, bail};
 use turbo_rcstr::RcStr;
-use turbo_tasks::{FxIndexMap, OptionVcExt, ResolvedVc, Value, Vc};
+use turbo_tasks::{FxIndexMap, FxIndexSet, OptionVcExt, ResolvedVc, Value, Vc};
 use turbo_tasks_env::{EnvMap, ProcessEnv};
 use turbo_tasks_fs::FileSystemPath;
 use turbopack::{
@@ -132,11 +132,18 @@ pub async fn get_server_resolve_options_context(
     mode: Vc<NextMode>,
     next_config: Vc<NextConfig>,
     execution_context: Vc<ExecutionContext>,
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
 ) -> Result<Vc<ResolveOptionsContext>> {
-    let next_server_import_map =
-        get_next_server_import_map(*project_path, ty, next_config, execution_context)
-            .to_resolved()
-            .await?;
+    let next_server_import_map: ResolvedVc<turbopack_core::resolve::options::ImportMap> =
+        get_next_server_import_map(
+            *project_path,
+            ty,
+            next_config,
+            execution_context,
+            collected_root_params,
+        )
+        .to_resolved()
+        .await?;
     let foreign_code_context_condition =
         foreign_code_context_condition(next_config, project_path).await?;
     let root_dir = project_path.root().to_resolved().await?;

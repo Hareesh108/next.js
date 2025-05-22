@@ -203,6 +203,16 @@ impl AppProject {
     }
 
     #[turbo_tasks::function]
+    async fn app_collected_root_params(self: Vc<Self>) -> Vc<FxIndexSet<RcStr>> {
+        let entrypoints = self.app_entrypoints().await?;
+        let mut collected_root_params = FxIndexSet::<RcStr>::default();
+        for (_, entrypoint) in entrypoints.iter() {
+            collected_root_params.extend(entrypoint.root_params().await?.iter());
+        }
+        Vc::cell(collected_root_params)
+    }
+
+    #[turbo_tasks::function]
     async fn client_module_options_context(self: Vc<Self>) -> Result<Vc<ModuleOptionsContext>> {
         Ok(get_client_module_options_context(
             self.project().project_path(),
@@ -298,6 +308,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -309,6 +320,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -320,6 +332,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -333,6 +346,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -619,6 +633,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -630,6 +645,7 @@ impl AppProject {
             self.project().next_mode(),
             self.project().next_config(),
             self.project().execution_context(),
+            self.app_collected_root_params(),
         ))
     }
 
@@ -967,7 +983,9 @@ pub fn app_entry_point_to_route(
     entrypoint: AppEntrypoint,
 ) -> Vc<Route> {
     match entrypoint {
-        AppEntrypoint::AppPage { pages, loader_tree } => Route::AppPage(
+        AppEntrypoint::AppPage {
+            pages, loader_tree, ..
+        } => Route::AppPage(
             pages
                 .into_iter()
                 .map(|page| AppPageRoute {
@@ -1001,6 +1019,7 @@ pub fn app_entry_point_to_route(
             page,
             path,
             root_layouts,
+            ..
         } => Route::AppRoute {
             original_name: page.to_string().into(),
             endpoint: ResolvedVc::upcast(
@@ -1012,7 +1031,7 @@ pub fn app_entry_point_to_route(
                 .resolved_cell(),
             ),
         },
-        AppEntrypoint::AppMetadata { page, metadata } => Route::AppRoute {
+        AppEntrypoint::AppMetadata { page, metadata, .. } => Route::AppRoute {
             original_name: page.to_string().into(),
             endpoint: ResolvedVc::upcast(
                 AppEndpoint {

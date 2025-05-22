@@ -1,14 +1,17 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
+use indoc::formatdoc;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use turbo_rcstr::RcStr;
-use turbo_tasks::{FxIndexMap, ResolvedVc, Value, Vc, fxindexmap};
-use turbo_tasks_fs::{FileSystem, FileSystemPath};
+use turbo_tasks::{FxIndexMap, FxIndexSet, ResolvedVc, Value, Vc, fxindexmap};
+use turbo_tasks_fs::{File, FileContent, FileSystem, FileSystemPath};
 use turbopack_core::{
+    asset::AssetContent,
     reference_type::{CommonJsReferenceSubType, ReferenceType},
     resolve::{
-        AliasPattern, ExternalTraced, ExternalType, ResolveAliasMap, SubpathValue,
+        AliasPattern, ExternalTraced, ExternalType, ResolveAliasMap, ResolveResult, SubpathValue,
         node::node_cjs_resolve_options,
         options::{ConditionValue, ImportMap, ImportMapping, ResolvedMap},
         parse::Request,
@@ -16,11 +19,12 @@ use turbopack_core::{
         resolve,
     },
     source::Source,
+    virtual_source::VirtualSource,
 };
 use turbopack_node::execution_context::ExecutionContext;
 
 use crate::{
-    embed_js::{VIRTUAL_PACKAGE_NAME, next_js_fs},
+    embed_js::{VIRTUAL_PACKAGE_NAME, next_js_file_path, next_js_fs},
     mode::NextMode,
     next_client::context::ClientContextType,
     next_config::NextConfig,
@@ -290,6 +294,7 @@ pub async fn get_next_server_import_map(
     ty: Value<ServerContextType>,
     next_config: Vc<NextConfig>,
     execution_context: Vc<ExecutionContext>,
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
 ) -> Result<Vc<ImportMap>> {
     let mut import_map = ImportMap::empty();
 
@@ -372,6 +377,7 @@ pub async fn get_next_server_import_map(
         ty,
         NextRuntime::NodeJs,
         next_config,
+        collected_root_params,
     )
     .await?;
 
@@ -385,6 +391,7 @@ pub async fn get_next_edge_import_map(
     ty: Value<ServerContextType>,
     next_config: Vc<NextConfig>,
     execution_context: Vc<ExecutionContext>,
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
 ) -> Result<Vc<ImportMap>> {
     let mut import_map = ImportMap::empty();
 
@@ -483,6 +490,7 @@ pub async fn get_next_edge_import_map(
         ty,
         NextRuntime::Edge,
         next_config,
+        collected_root_params,
     )
     .await?;
 
@@ -565,6 +573,7 @@ async fn insert_next_server_special_aliases(
     ty: ServerContextType,
     runtime: NextRuntime,
     next_config: Vc<NextConfig>,
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
 ) -> Result<()> {
     let external_cjs_if_node =
         move |context_dir: ResolvedVc<FileSystemPath>, request: &str| match runtime {
@@ -674,12 +683,57 @@ async fn insert_next_server_special_aliases(
         }
     }
 
+    match ty {
+        ServerContextType::AppRSC { .. } | ServerContextType::AppRoute { .. } => {
+            import_map.insert_exact_alias(
+                "next/rootparams",
+                get_next_rootparams_mapping(collected_root_params)
+                    .to_resolved()
+                    .await?,
+            );
+        }
+        _ => {}
+    }
+
     import_map.insert_exact_alias(
         "@vercel/og",
         external_cjs_if_node(project_path, "next/dist/server/og/image-response"),
     );
 
     Ok(())
+}
+
+#[turbo_tasks::function]
+async fn get_next_rootparams_mapping(
+    collected_root_params: Vc<FxIndexSet<RcStr>>,
+) -> Result<Vc<ImportMapping>> {
+    let collected_root_params = collected_root_params.await?;
+    let js_asset = VirtualSource::new(
+        next_js_file_path("rootparams.js".into()),
+        AssetContent::file(
+            FileContent::Content(
+                *collected_root_params
+                    .iter()
+                    .map(|param_name| {
+                        formatdoc!(
+                            r#"
+                                /** Reads the '{param_name}' root param. */
+                                "export function {param_name}() {{ return Promise.resolve(name) }}"
+                            "#,
+                            param_name = param_name,
+                        )
+                    })
+                    .join("\n")
+                    .into(),
+            )
+            .cell(),
+        ),
+    )
+    .to_resolved()
+    .await?;
+
+    let mapping = ImportMapping::Direct(ResolveResult::source(ResolvedVc::upcast(js_asset)));
+    Ok(mapping.cell())
 }
 
 async fn get_react_client_package(next_config: Vc<NextConfig>) -> Result<&'static str> {
