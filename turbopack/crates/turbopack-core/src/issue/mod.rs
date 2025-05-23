@@ -400,36 +400,39 @@ impl CapturedIssues {
 
     // Returns all the issues as formatted `PlainIssues`.
     pub async fn get_plain_issues(&self) -> Result<Vec<ReadRef<PlainIssue>>> {
-        let graphs = self
-            .graphs
-            .iter()
-            .map(|&g| async move {
-                let graph = ResolvedVc::try_downcast_type::<SingleModuleGraph>(g)
-                    .expect(
-                        "`SingleModuleGraph` should be the only implementation of \
-                         CollectibleModuleGraph",
-                    )
-                    .await?;
-                graph.compute_import_traces_for_issues(&self.issues).await
-            })
-            .try_join()
-            .await?;
+        let issue_to_trace = {
+            let graphs = self
+                .graphs
+                .iter()
+                .map(|&g| async move {
+                    let graph = ResolvedVc::try_downcast_type::<SingleModuleGraph>(g)
+                        .expect(
+                            "`SingleModuleGraph` should be the only implementation of \
+                             CollectibleModuleGraph",
+                        )
+                        .await?;
+                    graph.compute_import_traces_for_issues(&self.issues).await
+                })
+                .try_join()
+                .await?;
 
-        // Merge them all
-        let mut issue_to_traces: FxHashMap<ResolvedVc<Box<dyn Issue>>, Vc<ImportTraces>> =
-            FxHashMap::with_capacity_and_hasher(self.issues.len(), Default::default());
-        for graph in graphs {
-            for (issue, traces) in graph {
-                match issue_to_traces.entry(issue) {
-                    Entry::Occupied(mut entry) => {
-                        *entry.get_mut() = entry.get().concat(traces);
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(traces);
+            // Merge them all
+            let mut issue_to_traces: FxHashMap<ResolvedVc<Box<dyn Issue>>, Vc<ImportTraces>> =
+                FxHashMap::with_capacity_and_hasher(self.issues.len(), Default::default());
+            for graph in graphs {
+                for (issue, traces) in graph {
+                    match issue_to_traces.entry(issue) {
+                        Entry::Occupied(mut entry) => {
+                            *entry.get_mut() = entry.get().concat(traces);
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(traces);
+                        }
                     }
                 }
             }
-        }
+            issue_to_traces
+        };
 
         let mut list = self
             .issues
@@ -674,9 +677,11 @@ impl ImportTraces {
     }
 
     #[turbo_tasks::function]
-    pub async fn push(&self, other: ResolvedVc<ImportTrace>) -> Result<Vc<Self>> {
+    pub fn push(&self, other: ResolvedVc<ImportTrace>) -> Result<Vc<Self>> {
         Ok(Self([self.0.clone(), vec![other]].concat()).cell())
     }
+
+    // Flatten this set of traces into a simpler format for formatting.
     #[turbo_tasks::function]
     pub async fn into_plain(&self) -> Result<Vc<PlainImportTraces>> {
         let mut plain_traces = self
@@ -697,15 +702,12 @@ impl ImportTraces {
         if plain_traces.len() > 1 {
             let mut i = 0;
             while i < plain_traces.len() - 1 {
-                let mut j = i + 1;
-                while j < plain_traces.len() {
+                let mut j = plain_traces.len() - 1;
+                while j > i {
                     if plain_traces[j].ends_with(&plain_traces[i]) {
                         plain_traces.remove(j);
-                        // don't increment `j` if we have deleted it, the next iteration will read
-                        // the new element slotted in.
-                    } else {
-                        j += 1;
                     }
+                    j -= 1;
                 }
                 i += 1;
             }

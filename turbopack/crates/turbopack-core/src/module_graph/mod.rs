@@ -792,10 +792,11 @@ impl SingleModuleGraph {
                 }
             }
         }
-        // now we need to map filepaths back to issues
-        // We can do this by iterating the issue_paths
         let mut issue_to_traces: FxHashMap<ResolvedVc<Box<dyn Issue>>, Vc<ImportTraces>> =
             FxHashMap::with_capacity_and_hasher(issues.len(), Default::default());
+        // Map filepaths back to issues
+        // We can do this by zipping the issue_paths with the issues since they are in the same
+        // order.
         for (path, issue) in issue_paths.iter().zip(issues) {
             if let Some(traces) = file_path_to_traces.get(path) {
                 match issue_to_traces.entry(*issue) {
