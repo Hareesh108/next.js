@@ -129,9 +129,9 @@ export function processIssues(
 }
 
 export function formatIssue(issue: Issue) {
-  const { filePath, title, description, source, importTrace } = issue
+  const { filePath, title, description, source, importTraces } = issue
   let { documentationLink } = issue
-  let formattedTitle = renderStyledStringToErrorAnsi(title).replace(
+  const formattedTitle = renderStyledStringToErrorAnsi(title).replace(
     /\n/g,
     '\n    '
   )
@@ -144,14 +144,14 @@ export function formatIssue(issue: Issue) {
     documentationLink = 'https://nextjs.org/docs/messages/module-not-found'
   }
 
-  let formattedFilePath = filePath
+  const formattedFilePath = filePath
     .replace('[project]/', './')
     .replaceAll('/./', '/')
     .replace('\\\\?\\', '')
 
   let message = ''
 
-  if (source && source.range) {
+  if (source?.range) {
     const { start } = source.range
     message = `${formattedFilePath}:${start.line + 1}:${
       start.column + 1
@@ -198,11 +198,13 @@ export function formatIssue(issue: Issue) {
   //   message += renderStyledStringToErrorAnsi(detail) + '\n\n'
   // }
 
-  if (importTrace) {
-    message +=
-      'Import trace for requested module:\n' +
-      importTrace.map((i) => '  ' + i).join('\n') +
-      '\n\n'
+  if (importTraces?.length) {
+    // TODO: better display ideas
+    // 1. merge common prefixes in the traces to display as a tree
+    // 2. add some logical idea of the root to the trace header 'import trace from SSR'...
+    for (const trace of importTraces) {
+      message += `Import trace for requested module:\n${trace.map((item) => '  ' + item).join('\n')}\n\n`
+    }
   }
   if (documentationLink) {
     message += documentationLink + '\n\n'

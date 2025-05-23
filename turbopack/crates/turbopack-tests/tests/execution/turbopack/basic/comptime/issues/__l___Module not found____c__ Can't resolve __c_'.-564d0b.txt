@@ -19,6 +19,6 @@ error - [resolve] [project]/turbopack/crates/turbopack-tests/tests/execution/tur
   | Type of request: commonjs request
   | 
   Import trace for requested module:
-    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/comptime/input/index.js [test] (ecmascript)
-    [project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => "[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/comptime/input/index.js [test] (ecmascript)" } [test] (ecmascript)
-    [turbopack-node]/ipc/evaluate.ts/evaluate.js { INNER => "[project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => \"[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/comptime/input/index.js [test] (ecmascript)\" } [test] (ecmascript)", RUNTIME => "[turbopack-node]/ipc/evaluate.ts [test] (ecmascript)" } [test] (ecmascript)
+    turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/comptime/input/index.js
+    turbopack/crates/turbopack-tests/js/jest-entry.ts
+    ipc/evaluate.ts/evaluate.js

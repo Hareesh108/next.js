@@ -17,4 +17,4 @@
   ) is very dynamic
   
   Import trace for requested module:
-    [project]/turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test] (ecmascript)
+    turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js

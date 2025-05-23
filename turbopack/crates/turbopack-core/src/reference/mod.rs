@@ -282,12 +282,11 @@ pub struct ModulesWithChunkingType(Vec<(ChunkingType, ModulesVec)>);
 /// primary [Module]s referenced.
 ///
 /// [Module]: crate::module::Module
-#[turbo_tasks::function(operation)]
+#[turbo_tasks::function]
 pub async fn primary_chunkable_referenced_modules(
-    module: ResolvedVc<Box<dyn Module>>,
+    module: Vc<Box<dyn Module>>,
     include_traced: bool,
 ) -> Result<Vc<ModulesWithChunkingType>> {
-    turbo_tasks::mark_root();
     let modules = module
         .references()
         .await?

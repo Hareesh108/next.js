@@ -322,9 +322,7 @@ impl Visit<VisitClientReferenceNode> for VisitClientReference {
             };
 
             let referenced_modules =
-                primary_chunkable_referenced_modules(parent_module, include_traced)
-                    .connect()
-                    .await?;
+                primary_chunkable_referenced_modules(*parent_module, include_traced).await?;
 
             let referenced_modules = referenced_modules
                 .iter()

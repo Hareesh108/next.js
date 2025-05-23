@@ -11,4 +11,4 @@ error - [analysis] [project]/turbopack/crates/turbopack-tests/tests/snapshot/imp
   the name `Table` is defined multiple times
   
   Import trace for requested module:
-    [project]/turbopack/crates/turbopack-tests/tests/snapshot/imports/duplicate-binding/input/index.js [test] (ecmascript)
+    turbopack/crates/turbopack-tests/tests/snapshot/imports/duplicate-binding/input/index.js

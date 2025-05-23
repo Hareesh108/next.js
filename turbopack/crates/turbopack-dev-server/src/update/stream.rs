@@ -14,8 +14,8 @@ use turbo_tasks_fs::{FileSystem, FileSystemPath};
 use turbopack_core::{
     error::PrettyPrintError,
     issue::{
-        Issue, IssueDescriptionExt, IssueSeverity, IssueStage, OptionIssueProcessingPathItems,
-        OptionStyledString, PlainIssue, StyledString,
+        ImportTraces, Issue, IssueDescriptionExt, IssueSeverity, IssueStage,
+        OptionIssueProcessingPathItems, OptionStyledString, PlainIssue, StyledString,
     },
     server_fs::ServerFileSystem,
     version::{
@@ -131,7 +131,10 @@ async fn get_update_stream_item_operation(
                         .resolved_cell(),
                 }
                 .cell()
-                .into_plain(None, OptionIssueProcessingPathItems::none())
+                .into_plain(
+                    ImportTraces::empty(),
+                    OptionIssueProcessingPathItems::none(),
+                )
                 .await?,
             );
 

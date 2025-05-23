@@ -170,10 +170,13 @@ pub fn format_issue(
             writeln!(styled_issue, "{path}").unwrap();
         }
     }
-    if let Some(trace) = &plain_issue.import_trace {
-        writeln!(styled_issue, "Import trace for requested module:").unwrap();
-        for line in trace {
-            writeln!(styled_issue, "  {line}").unwrap();
+    let traces = &*plain_issue.import_traces;
+    if !traces.is_empty() {
+        for trace in traces {
+            writeln!(styled_issue, "Import trace for requested module:").unwrap();
+            for line in trace {
+                writeln!(styled_issue, "  {line}").unwrap();
+            }
         }
     }
 

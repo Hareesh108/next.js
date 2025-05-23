@@ -19,7 +19,7 @@ error - [bindings] [project]/turbopack/crates/turbopack-tests/tests/execution/tu
   | Abd, Eef, a, b, c
   | 
   Import trace for requested module:
-    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/invalid-export/index.js [test] (ecmascript)
-    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/index.js [test] (ecmascript)
-    [project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => "[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/index.js [test] (ecmascript)" } [test] (ecmascript)
-    [turbopack-node]/ipc/evaluate.ts/evaluate.js { INNER => "[project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => \"[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/index.js [test] (ecmascript)\" } [test] (ecmascript)", RUNTIME => "[turbopack-node]/ipc/evaluate.ts [test] (ecmascript)" } [test] (ecmascript)
+    turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/invalid-export/index.js
+    turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/index.js
+    turbopack/crates/turbopack-tests/js/jest-entry.ts
+    ipc/evaluate.ts/evaluate.js

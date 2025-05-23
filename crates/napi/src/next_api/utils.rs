@@ -284,7 +284,7 @@ pub struct NapiIssue {
     pub detail: Option<serde_json::Value>,
     pub source: Option<NapiIssueSource>,
     pub documentation_link: String,
-    pub import_trace: Option<serde_json::Value>,
+    pub import_traces: Vec<serde_json::Value>,
 }
 
 impl From<&PlainIssue> for NapiIssue {
@@ -304,10 +304,11 @@ impl From<&PlainIssue> for NapiIssue {
             severity: issue.severity.as_str().to_string(),
             source: issue.source.as_ref().map(|source| source.into()),
             title: serde_json::to_value(StyledStringSerialize::from(&issue.title)).unwrap(),
-            import_trace: issue
-                .import_trace
-                .as_ref()
-                .map(|trace| serde_json::to_value(&**trace).unwrap()),
+            import_traces: issue
+                .import_traces
+                .iter()
+                .map(|trace| serde_json::to_value(trace).unwrap())
+                .collect(),
         }
     }
 }

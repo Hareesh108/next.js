@@ -6,6 +6,7 @@ pub mod resolve;
 use std::{
     borrow::Cow,
     cmp::{Ordering, min},
+    collections::hash_map::Entry,
     fmt::{Display, Formatter},
 };
 
@@ -25,6 +26,7 @@ use turbo_tasks_hash::{DeterministicHash, Xxh3Hash64Hasher};
 
 use crate::{
     asset::{Asset, AssetContent},
+    module_graph::SingleModuleGraph,
     source::Source,
     source_map::{GenerateSourceMap, SourceMap, TokenWithSource},
     source_pos::SourcePos,
@@ -151,7 +153,7 @@ pub trait Issue {
 
     async fn into_plain(
         self: Vc<Self>,
-        import_trace: Option<ResolvedVc<ImportTrace>>,
+        import_traces: Vc<ImportTraces>,
         processing_path: Vc<OptionIssueProcessingPathItems>,
     ) -> Result<Vc<PlainIssue>> {
         let description = match *self.description().await? {
@@ -179,32 +181,19 @@ pub trait Issue {
                 }
             },
             processing_path: processing_path.into_plain().await?,
-            import_trace: if let Some(s) = import_trace {
-                Some(s.await?)
-            } else {
-                None
-            },
+            import_traces: import_traces.into_plain().await?,
         }
         .cell())
     }
 }
 
-// A collectible trait wrapper for `ImportTraceForIssues`
-// To access data simply downcast to `ImportTraceForIssues`
+#[turbo_tasks::value]
+pub struct OptionImportTraces(Vec<Option<ImportTrace>>);
+
+// A collectible marker trait that wraps a `SingleModuleGraph`
+// It should be downcast access the graph.
 #[turbo_tasks::value_trait]
-pub trait ImportTraceForIssuesTrait {}
-
-// An association between an import trace and a collection of issues reported for a given module.
-// Used to augment issue reporting.
-//
-#[turbo_tasks::value(shared)]
-pub struct ImportTraceForIssues {
-    pub path: ResolvedVc<ImportTrace>,
-    pub issues: Vec<ResolvedVc<Box<dyn Issue>>>,
-}
-
-#[turbo_tasks::value_impl]
-impl ImportTraceForIssuesTrait for ImportTraceForIssues {}
+pub trait CollectibleModuleGraph {}
 
 #[turbo_tasks::value_trait]
 trait IssueProcessingPath {
@@ -381,7 +370,7 @@ pub struct CapturedIssues {
     issues: AutoSet<ResolvedVc<Box<dyn Issue>>>,
     #[cfg(feature = "issue_path")]
     processing_path: ResolvedVc<ItemIssueProcessingPath>,
-    import_trace: AutoSet<ResolvedVc<Box<dyn ImportTraceForIssuesTrait>>>,
+    graphs: AutoSet<ResolvedVc<Box<dyn CollectibleModuleGraph>>>,
 }
 
 #[turbo_tasks::value_impl]
@@ -411,34 +400,51 @@ impl CapturedIssues {
 
     // Returns all the issues as formatted `PlainIssues`.
     pub async fn get_plain_issues(&self) -> Result<Vec<ReadRef<PlainIssue>>> {
-        let issue_to_trace = self
-            .import_trace
+        let graphs = self
+            .graphs
             .iter()
-            .map(|trace| async move {
-                ResolvedVc::try_downcast_type::<ImportTraceForIssues>(*trace)
-                    .unwrap()
-                    .await
+            .map(|&g| async move {
+                let graph = ResolvedVc::try_downcast_type::<SingleModuleGraph>(g)
+                    .expect(
+                        "`SingleModuleGraph` should be the only implementation of \
+                         CollectibleModuleGraph",
+                    )
+                    .await?;
+                graph.compute_import_traces_for_issues(&self.issues).await
             })
             .try_join()
-            .await?
-            .iter()
-            .flat_map(|trace| trace.issues.iter().map(|issue| (*issue, *trace.path)))
-            .collect::<FxHashMap<_, _>>();
+            .await?;
+
+        // Merge them all
+        let mut issue_to_traces: FxHashMap<ResolvedVc<Box<dyn Issue>>, Vc<ImportTraces>> =
+            FxHashMap::with_capacity_and_hasher(self.issues.len(), Default::default());
+        for graph in graphs {
+            for (issue, traces) in graph {
+                match issue_to_traces.entry(issue) {
+                    Entry::Occupied(mut entry) => {
+                        *entry.get_mut() = entry.get().concat(traces);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(traces);
+                    }
+                }
+            }
+        }
 
         let mut list = self
             .issues
             .iter()
             .map(|&issue| {
-                let issue_to_trace = &issue_to_trace;
+                let issue_to_traces = &issue_to_traces;
                 async move {
-                    let import_trace = issue_to_trace.get(&issue).cloned();
+                    let import_traces = issue_to_traces.get(&issue).cloned().unwrap();
                     #[cfg(feature = "issue_path")]
                     return issue
-                        .into_plain(import_trace, self.processing_path.shortest_path(*issue))
+                        .into_plain(import_traces, self.processing_path.shortest_path(*issue))
                         .await;
                     #[cfg(not(feature = "issue_path"))]
                     return issue
-                        .into_plain(import_trace, OptionIssueProcessingPathItems::none())
+                        .into_plain(import_traces, OptionIssueProcessingPathItems::none())
                         .await;
                 }
             })
@@ -648,7 +654,45 @@ pub struct OptionIssueSource(Option<IssueSource>);
 pub struct OptionStyledString(Option<ResolvedVc<StyledString>>);
 
 #[turbo_tasks::value(transparent, shared)]
+#[derive(Clone, Debug, PartialOrd, Ord)]
 pub struct ImportTrace(pub Vec<RcStr>);
+
+#[turbo_tasks::value(transparent, shared)]
+pub struct ImportTraces(pub Vec<ResolvedVc<ImportTrace>>);
+
+#[turbo_tasks::value_impl]
+impl ImportTraces {
+    #[turbo_tasks::function]
+    pub fn empty() -> Vc<Self> {
+        Self(Vec::new()).cell()
+    }
+
+    #[turbo_tasks::function]
+    pub async fn concat(&self, other: Vc<ImportTraces>) -> Result<Vc<Self>> {
+        let other_items = &*other.await?;
+        Ok(Self([self.0.clone(), other_items.clone()].concat()).cell())
+    }
+
+    #[turbo_tasks::function]
+    pub async fn push(&self, other: ResolvedVc<ImportTrace>) -> Result<Vc<Self>> {
+        Ok(Self([self.0.clone(), vec![other]].concat()).cell())
+    }
+    #[turbo_tasks::function]
+    pub async fn into_plain(&self) -> Result<Vc<PlainImportTraces>> {
+        Ok(PlainImportTraces(
+            self.0
+                .iter()
+                .map(|trace| async move { Ok((*trace.await?).clone()) })
+                .try_join()
+                .await?,
+        )
+        .cell())
+    }
+}
+
+#[turbo_tasks::value(transparent, serialization = "none")]
+#[derive(Clone, Debug, DeterministicHash, PartialOrd, Ord)]
+pub struct PlainImportTraces(pub Vec<Vec<RcStr>>);
 
 #[turbo_tasks::value(shared, serialization = "none")]
 #[derive(Clone, Debug, PartialOrd, Ord, DeterministicHash, Serialize)]
@@ -707,7 +751,7 @@ pub struct PlainIssue {
 
     pub source: Option<PlainIssueSource>,
     pub processing_path: ReadRef<PlainIssueProcessingPath>,
-    pub import_trace: Option<ReadRef<ImportTrace>>,
+    pub import_traces: ReadRef<PlainImportTraces>,
 }
 
 fn hash_plain_issue(issue: &PlainIssue, hasher: &mut Xxh3Hash64Hasher, full: bool) {
@@ -955,7 +999,7 @@ where
                 None,
                 self.peek_collectibles(),
             )),
-            import_trace: self.peek_collectibles(),
+            graphs: self.peek_collectibles(),
         })
     }
 
@@ -967,7 +1011,7 @@ where
                 None,
                 self.take_collectibles(),
             )),
-            import_trace: self.take_collectibles(),
+            graphs: self.take_collectibles(),
         })
     }
 }

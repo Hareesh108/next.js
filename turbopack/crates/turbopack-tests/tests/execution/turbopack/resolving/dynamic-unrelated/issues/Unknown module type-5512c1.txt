@@ -1,9 +1,0 @@
-error - [process module] [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/resolving/dynamic-unrelated/input/sub/helper.txt  Unknown module type
-  This module doesn't have an associated type. Use a known file extension, or register a loader for it.
-  
-  Read more: https://nextjs.org/docs/app/api-reference/next-config-js/turbo#webpack-loaders
-  
-  Import trace for requested module:
-    [project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/resolving/dynamic-unrelated/input/index.js [test] (ecmascript)
-    [project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => "[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/resolving/dynamic-unrelated/input/index.js [test] (ecmascript)" } [test] (ecmascript)
-    [turbopack-node]/ipc/evaluate.ts/evaluate.js { INNER => "[project]/turbopack/crates/turbopack-tests/js/jest-entry.ts { TESTS => \"[project]/turbopack/crates/turbopack-tests/tests/execution/turbopack/resolving/dynamic-unrelated/input/index.js [test] (ecmascript)\" } [test] (ecmascript)", RUNTIME => "[turbopack-node]/ipc/evaluate.ts [test] (ecmascript)" } [test] (ecmascript)

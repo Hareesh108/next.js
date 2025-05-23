@@ -95,7 +95,7 @@ export interface Issue {
     }
   }
   documentationLink: string
-  importTrace?: string[]
+  importTraces?: string[][]
 }
 
 export interface Diagnostics {
