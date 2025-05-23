@@ -199,11 +199,15 @@ export function formatIssue(issue: Issue) {
   // }
 
   if (importTraces?.length) {
-    // TODO: better display ideas
-    // 1. merge common prefixes in the traces to display as a tree
-    // 2. add some logical idea of the root to the trace header 'import trace from SSR'...
-    for (const trace of importTraces) {
-      message += `Import trace for requested module:\n${trace.map((item) => '  ' + item).join('\n')}\n\n`
+    // This is the same logic as in turbopack/crates/turbopack-core/src/module_graph/mod.rs
+    if (importTraces.length > 1) {
+      // We end up with multiple traces when the file with the error is reachable from multiple different entry points (e.g. ssr, client)
+      message += 'Import traces for the requested module:\n'
+      for (let i = 0; i < importTraces.length; i++) {
+        message += `  Trace #${i + 1}:\n${importTraces[i].map((item) => `    ${item}`).join('\n')}\n\n`
+      }
+    } else {
+      message += `Import trace for the requested module:\n${importTraces[0].map((item) => `  ${item}`).join('\n')}\n\n`
     }
   }
   if (documentationLink) {

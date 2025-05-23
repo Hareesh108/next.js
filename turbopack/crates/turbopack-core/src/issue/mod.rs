@@ -679,14 +679,38 @@ impl ImportTraces {
     }
     #[turbo_tasks::function]
     pub async fn into_plain(&self) -> Result<Vc<PlainImportTraces>> {
-        Ok(PlainImportTraces(
-            self.0
-                .iter()
-                .map(|trace| async move { Ok((*trace.await?).clone()) })
-                .try_join()
-                .await?,
-        )
-        .cell())
+        let mut plain_traces = self
+            .0
+            .iter()
+            .map(|trace| async move { Ok((*trace.await?).clone()) })
+            .try_join()
+            .await?;
+        // Sort so the shortest traces come first
+        plain_traces.sort_by_key(|t| t.len());
+        // Now see if there are any overlaps
+        // If two of the traces overlap that means one is a suffix of another one.  Because we are
+        // computing shortest paths in the same graph and the shortest path algorithm we use is
+        // deterministic.
+        // Technically this is a quadratic algorithm since we need to compare each trace with all
+        // subsequent traces, however there are rarely more than 3 traces and certainly never more
+        // than 10.
+        if plain_traces.len() > 1 {
+            let mut i = 0;
+            while i < plain_traces.len() - 1 {
+                let mut j = i + 1;
+                while j < plain_traces.len() {
+                    if plain_traces[j].ends_with(&plain_traces[i]) {
+                        plain_traces.remove(j);
+                        // don't increment `j` if we have deleted it, the next iteration will read
+                        // the new element slotted in.
+                    } else {
+                        j += 1;
+                    }
+                }
+                i += 1;
+            }
+        }
+        Ok(PlainImportTraces(plain_traces).cell())
     }
 }
 

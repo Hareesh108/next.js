@@ -727,7 +727,6 @@ impl SingleModuleGraph {
                 .or_insert(ImportTraces::empty());
         }
 
-        // Reverse the graph so we can find paths to roots
         {
             let modules = self
                 .modules
@@ -737,6 +736,7 @@ impl SingleModuleGraph {
                 })
                 .try_join()
                 .await?;
+            // Reverse the graph so we can find paths to roots
             let reversed_graph = Reversed(&self.graph.0);
             for (path, module_idx) in modules {
                 if let Entry::Occupied(mut entry) = file_path_to_traces.entry(path) {
@@ -776,15 +776,14 @@ impl SingleModuleGraph {
                     let path = path
                         .into_iter()
                         .map(async |n| {
-                            Ok(self
+                            Ok((*self
                                 .graph
                                 .node_weight(n)
                                 .unwrap()
                                 .module()
                                 .ident()
-                                .path()
-                                .await?
-                                .path
+                                .trace_display_name()
+                                .await?)
                                 .clone())
                         })
                         .try_join()

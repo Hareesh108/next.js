@@ -12,4 +12,4 @@
   - *0* import.meta: The import.meta object
   
   Import trace for requested module:
-    turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js
+    turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test]

@@ -165,16 +165,24 @@ export function runErrorRecoveryHmrTest(nextConfig: {
 
     if (process.env.IS_TURBOPACK_TEST) {
       expect(source).toMatchInlineSnapshot(`
-         "./pages/hmr/about2.js (7:1)
-         Parsing ecmascript source code failed
-           5 |     div
-           6 |   )
-         > 7 | }
-             | ^
-           8 |
+       "./pages/hmr/about2.js (7:1)
+       Parsing ecmascript source code failed
+         5 |     div
+         6 |   )
+       > 7 | }
+           | ^
+         8 |
 
-         Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?"
-        `)
+       Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
+
+       Import traces for the requested module:
+         Trace #1:
+           ./pages/hmr/about2.js
+
+         Trace #2:
+           ./pages/hmr/about2.js [ssr]
+           ./node_modules/.pnpm/next@file+..+next-repo-2bdcc95c2ab67d5b9deb55d2117218d73861765f87cc9b8c541db67f185674d5_f31a1a11749f99a8a0283d5882afcbf1/node_modules/next/dist/esm/build/templates/pages.js [GENERATED] [ssr]"
+      `)
     } else if (process.env.NEXT_RSPACK) {
       expect(trimEndMultiline(source)).toMatchInlineSnapshot(`
          "./pages/hmr/about2.js
@@ -602,17 +610,29 @@ export function runErrorRecoveryHmrTest(nextConfig: {
       if (process.env.IS_TURBOPACK_TEST) {
         expect(next.normalizeTestDirContent(redboxSource))
           .toMatchInlineSnapshot(`
-           "./components/parse-error.js (3:1)
-           Parsing ecmascript source code failed
-             1 | This
-             2 | is
-           > 3 | }}}
-               | ^
-             4 | invalid
-             5 | js
+         "./components/parse-error.js (3:1)
+         Parsing ecmascript source code failed
+           1 | This
+           2 | is
+         > 3 | }}}
+             | ^
+           4 | invalid
+           5 | js
 
-           Expression expected"
-          `)
+         Expression expected
+
+         Import traces for the requested module:
+           Trace #1:
+             ./components/parse-error.js [ssr]
+             ./pages/hmr/about9.js [ssr]
+             ./node_modules/.pnpm/next@file+..+next-repo-2bdcc95c2ab67d5b9deb55d2117218d73861765f87cc9b8c541db67f185674d5_f31a1a11749f99a8a0283d5882afcbf1/node_modules/next/dist/esm/build/templates/pages.js [GENERATED] [ssr]
+
+           Trace #2:
+             ./components/parse-error.js [client]
+             ./pages/hmr/about9.js [client]
+             [next]/entry/page-loader.ts [GENERATED] [client]
+             ./pages/hmr/about9.js"
+        `)
       } else if (process.env.NEXT_RSPACK) {
         expect(trimEndMultiline(next.normalizeTestDirContent(redboxSource)))
           .toMatchInlineSnapshot(`

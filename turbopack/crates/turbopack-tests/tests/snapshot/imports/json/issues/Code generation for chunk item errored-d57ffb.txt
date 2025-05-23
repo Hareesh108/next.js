@@ -20,4 +20,4 @@ error - [code gen] [project]/turbopack/crates/turbopack-tests/tests/snapshot/imp
   
   Import trace for requested module:
     turbopack/crates/turbopack-tests/tests/snapshot/imports/json/input/invalid.json
-    turbopack/crates/turbopack-tests/tests/snapshot/imports/json/input/index.js
+    turbopack/crates/turbopack-tests/tests/snapshot/imports/json/input/index.js [test]

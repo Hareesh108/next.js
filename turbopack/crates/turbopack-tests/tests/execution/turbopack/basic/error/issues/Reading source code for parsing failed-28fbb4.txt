@@ -5,7 +5,7 @@ error - [load] [project]/turbopack/crates/turbopack-tests/tests/execution/turbop
   - invalid utf-8 sequence of 1 bytes from index 1
   
   Import trace for requested module:
-    turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/broken.js
-    turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/index.js
-    turbopack/crates/turbopack-tests/js/jest-entry.ts
-    ipc/evaluate.ts/evaluate.js
+    turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/broken.js [test]
+    turbopack/crates/turbopack-tests/tests/execution/turbopack/basic/error/input/index.js [test]
+    turbopack/crates/turbopack-tests/js/jest-entry.ts [GENERATED] [test]
+    [turbopack-node]/ipc/evaluate.ts/evaluate.js [GENERATED] [test]
