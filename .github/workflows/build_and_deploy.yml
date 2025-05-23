@@ -20,7 +20,7 @@ env:
   # See https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html#os-version for more details
   MACOSX_DEPLOYMENT_TARGET: 11.0
   # This will become "true" if the latest commit is
-  # "Version Packages" or "Version Pacakges (canary)"
+  # "Version Packages" or "Version Pacakges \((canary|rc)\)"
   # set from scripts/check-is-release.js
   __NEW_RELEASE: 'false'
 
@@ -50,7 +50,7 @@ jobs:
         run: |
           # TODO: Remove the new release check once the new release workflow is fully replaced.
           RELEASE_CHECK=$(node ./scripts/check-is-release.js 2> /dev/null || :)
-          if [[ $RELEASE_CHECK =~ ^Version\ Packages(\ \(canary\))?$ ]];
+          if [[ $RELEASE_CHECK =~ ^Version\ Packages(\ \((canary|rc)\))?$ ]];
           then
             echo "__NEW_RELEASE=true" >> $GITHUB_ENV
           elif [[ $RELEASE_CHECK = v* ]];
@@ -603,7 +603,7 @@ jobs:
 
       # New release process
       - name: Publish to NPM
-        id: publish-packages
+        id: changesets
         if: ${{ env.__NEW_RELEASE == 'true' }}
         uses: changesets/action@v1
         with:
@@ -620,9 +620,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Send a Slack notification of the publish status
+        run: pnpm tsx scripts/release/slack.ts
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          RELEASE_STATUS: ${{ steps.changesets.outputs.published }}
+          WORKFLOW_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_ACTOR: ${{ github.actor }}
+
       - name: Upload npm log artifact
+        if: steps.changesets.outputs.published == 'true'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: npm-publish-logs
           path: /home/runner/.npm/_logs/*
@@ -685,6 +693,15 @@ jobs:
         env:
           VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
           DEPLOY_ENVIRONMENT: production
+
+  buildPassed:
+    needs: ['deploy-target', 'build', 'build-wasm', 'build-native']
+    if: always()
+    name: thank you, build
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+        if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
 
   releaseStats:
     name: Release Stats
