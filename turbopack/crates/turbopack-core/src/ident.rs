@@ -368,11 +368,11 @@ impl AssetIdent {
         // Drop `[project]/` if present, this is the assumed default.
         // leave other prefixes in place.
         if s.starts_with("[project]/") {
-            s.replace_range(0.."[project]".len(), ".");
+            s.drain(0.."[project]/".len());
         }
 
         if !self.assets.is_empty() {
-            s.push_str(" [GENERATED]");
+            s.push_str(" [generated]");
         }
 
         if let Some(layer) = &self.layer {

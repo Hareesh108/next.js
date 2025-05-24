@@ -49,7 +49,7 @@ use turbopack_ecmascript_runtime::RuntimeType;
 use turbopack_node::{debug::should_debug, evaluate::evaluate};
 use turbopack_nodejs::NodeJsChunkingContext;
 use turbopack_resolve::resolve_options_context::ResolveOptionsContext;
-use turbopack_test_utils::jest::JestRunResult;
+use turbopack_test_utils::{jest::JestRunResult, snapshot::UPDATE};
 use turbopack_trace_utils::{
     filter_layer::FilterLayer, raw_trace::RawTraceLayer, trace_writer::TraceWriter,
     tracing_presets::TRACING_TURBO_TASKS_TARGETS,
@@ -193,7 +193,7 @@ async fn run(resource: PathBuf, snapshot_mode: IssueSnapshotMode) -> Result<JsRe
     let tt = TurboTasks::new(TurboTasksBackend::new(
         BackendOptions {
             storage_mode: None,
-            dependency_tracking: false,
+            dependency_tracking: *UPDATE,
             ..Default::default()
         },
         noop_backing_storage(),

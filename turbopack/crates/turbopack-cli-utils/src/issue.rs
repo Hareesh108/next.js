@@ -173,17 +173,22 @@ pub fn format_issue(
     let traces = &*plain_issue.import_traces;
     if !traces.is_empty() {
         if traces.len() == 1 {
-            writeln!(styled_issue, "Import trace for requested module:").unwrap();
+            writeln!(styled_issue, "Example import trace:").unwrap();
             for line in &traces[0] {
                 writeln!(styled_issue, "  {line}").unwrap();
             }
+            // tag the last element as an entrypoint for clarity
+            assert_eq!(Some('\n'), styled_issue.pop());
+            writeln!(styled_issue, " [entrypoint]\n").unwrap();
         } else {
-            writeln!(styled_issue, "Import traces for requested module:").unwrap();
+            writeln!(styled_issue, "Example import traces:").unwrap();
             for (index, trace) in traces.iter().enumerate() {
-                writeln!(styled_issue, "Trace #{}:", index + 1).unwrap();
+                writeln!(styled_issue, "#{}:", index + 1).unwrap();
                 for line in trace {
                     writeln!(styled_issue, "    {line}").unwrap();
                 }
+                assert_eq!(Some('\n'), styled_issue.pop());
+                writeln!(styled_issue, " [entrypoint]\n").unwrap();
             }
         }
     }

@@ -14,5 +14,5 @@ error - [resolve] [project]/turbopack/crates/turbopack-tests/tests/snapshot/impo
   | Path where resolving has started: [project]/turbopack/crates/turbopack-tests/tests/snapshot/imports/resolve_error_cjs/input/index.js
   | Type of request: commonjs request
   | 
-  Import trace for requested module:
-    turbopack/crates/turbopack-tests/tests/snapshot/imports/resolve_error_cjs/input/index.js [test]
+  Example import trace:
+    turbopack/crates/turbopack-tests/tests/snapshot/imports/resolve_error_cjs/input/index.js [test] [entrypoint]

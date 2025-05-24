@@ -18,8 +18,8 @@ error - [bindings] [project]/turbopack/crates/turbopack-tests/tests/execution/tu
   | These are the exports of the module:
   | Abd, Eef, a, b, c
   | 
-  Import trace for requested module:
+  Example import trace:
     turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/invalid-export/index.js [test]
     turbopack/crates/turbopack-tests/tests/execution/turbopack/exports/invalid-export/input/index.js [test]
-    turbopack/crates/turbopack-tests/js/jest-entry.ts [GENERATED] [test]
-    [turbopack-node]/ipc/evaluate.ts/evaluate.js [GENERATED] [test]
+    turbopack/crates/turbopack-tests/js/jest-entry.ts [generated] [test]
+    [turbopack-node]/ipc/evaluate.ts/evaluate.js [generated] [test] [entrypoint]

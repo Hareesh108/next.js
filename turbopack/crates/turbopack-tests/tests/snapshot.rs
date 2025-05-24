@@ -61,7 +61,7 @@ use turbopack_ecmascript_runtime::RuntimeType;
 use turbopack_env::ProcessEnvAsset;
 use turbopack_nodejs::NodeJsChunkingContext;
 use turbopack_resolve::resolve_options_context::ResolveOptionsContext;
-use turbopack_test_utils::snapshot::{diff, expected, matches_expected, snapshot_issues};
+use turbopack_test_utils::snapshot::{UPDATE, diff, expected, matches_expected, snapshot_issues};
 
 use crate::util::REPO_ROOT;
 
@@ -159,6 +159,9 @@ async fn run(resource: PathBuf) -> Result<()> {
     let tt = TurboTasks::new(TurboTasksBackend::new(
         BackendOptions {
             storage_mode: None,
+            // Enable dependency tracking when we are running under UPDATE=1 to ensure file writes
+            // don't crash the test.
+            dependency_tracking: *UPDATE,
             ..Default::default()
         },
         noop_backing_storage(),

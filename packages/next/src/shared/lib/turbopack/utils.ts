@@ -202,12 +202,12 @@ export function formatIssue(issue: Issue) {
     // This is the same logic as in turbopack/crates/turbopack-core/src/module_graph/mod.rs
     if (importTraces.length > 1) {
       // We end up with multiple traces when the file with the error is reachable from multiple different entry points (e.g. ssr, client)
-      message += 'Import traces for the requested module:\n'
+      message += 'Example import traces:\n'
       for (let i = 0; i < importTraces.length; i++) {
-        message += `  Trace #${i + 1}:\n${importTraces[i].map((item) => `    ${item}`).join('\n')}\n\n`
+        message += `  #${i + 1}:\n${importTraces[i].map((item) => `    ${item}`).join('\n')} [entrypoint]\n\n`
       }
     } else {
-      message += `Import trace for the requested module:\n${importTraces[0].map((item) => `  ${item}`).join('\n')}\n\n`
+      message += `Example import trace:\n${importTraces[0].map((item) => `  ${item}`).join('\n')} [entrypoint]\n\n`
     }
   }
   if (documentationLink) {

@@ -175,13 +175,13 @@ export function runErrorRecoveryHmrTest(nextConfig: {
 
        Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
 
-       Import traces for the requested module:
-         Trace #1:
-           ./pages/hmr/about2.js
+       Example import traces:
+         #1:
+           pages/hmr/about2.js [entrypoint]
 
-         Trace #2:
-           ./pages/hmr/about2.js [ssr]
-           ./node_modules/.pnpm/next@file+..+next-repo-2bdcc95c2ab67d5b9deb55d2117218d73861765f87cc9b8c541db67f185674d5_f31a1a11749f99a8a0283d5882afcbf1/node_modules/next/dist/esm/build/templates/pages.js [GENERATED] [ssr]"
+         #2:
+           pages/hmr/about2.js [ssr]
+           node_modules/.pnpm/next@file+..+next-repo-ac6384c13797ba1a9b5e9beac5adf9f9aad2768b421d003d24f66ca57cbc0838_4c18d07652a7b17b5d03441c6a186bb1/node_modules/next/dist/esm/build/templates/pages.js [generated] [ssr] [entrypoint]"
       `)
     } else if (process.env.NEXT_RSPACK) {
       expect(trimEndMultiline(source)).toMatchInlineSnapshot(`
@@ -621,17 +621,17 @@ export function runErrorRecoveryHmrTest(nextConfig: {
 
          Expression expected
 
-         Import traces for the requested module:
-           Trace #1:
-             ./components/parse-error.js [ssr]
-             ./pages/hmr/about9.js [ssr]
-             ./node_modules/.pnpm/next@file+..+next-repo-2bdcc95c2ab67d5b9deb55d2117218d73861765f87cc9b8c541db67f185674d5_f31a1a11749f99a8a0283d5882afcbf1/node_modules/next/dist/esm/build/templates/pages.js [GENERATED] [ssr]
+         Example import traces:
+           #1:
+             components/parse-error.js [ssr]
+             pages/hmr/about9.js [ssr]
+             node_modules/.pnpm/next@file+..+next-repo-ac6384c13797ba1a9b5e9beac5adf9f9aad2768b421d003d24f66ca57cbc0838_4c18d07652a7b17b5d03441c6a186bb1/node_modules/next/dist/esm/build/templates/pages.js [generated] [ssr] [entrypoint]
 
-           Trace #2:
-             ./components/parse-error.js [client]
-             ./pages/hmr/about9.js [client]
-             [next]/entry/page-loader.ts [GENERATED] [client]
-             ./pages/hmr/about9.js"
+           #2:
+             components/parse-error.js [client]
+             pages/hmr/about9.js [client]
+             [next]/entry/page-loader.ts [generated] [client]
+             pages/hmr/about9.js [entrypoint]"
         `)
       } else if (process.env.NEXT_RSPACK) {
         expect(trimEndMultiline(next.normalizeTestDirContent(redboxSource)))

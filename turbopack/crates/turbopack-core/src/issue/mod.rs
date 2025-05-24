@@ -400,7 +400,7 @@ impl CapturedIssues {
 
     // Returns all the issues as formatted `PlainIssues`.
     pub async fn get_plain_issues(&self) -> Result<Vec<ReadRef<PlainIssue>>> {
-        let issue_to_trace = {
+        let issue_to_traces = {
             let graphs = self
                 .graphs
                 .iter()

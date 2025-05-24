@@ -16,5 +16,5 @@
       [FreeVar(Math)["random"](), FreeVar(Math)["random"]()]
   ) is very dynamic
   
-  Import trace for requested module:
-    turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test]
+  Example import trace:
+    turbopack/crates/turbopack-tests/tests/snapshot/dynamic-request/very-dynamic/input/index.js [test] [entrypoint]
